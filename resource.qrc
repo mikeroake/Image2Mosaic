@@ -1,0 +1,23 @@
+<RCC>
+    <qresource prefix="/resources">
+        <file>Images/LegoBrick20.jpg</file>
+        <file>Palettes/Acrylic Full.csv</file>
+        <file>Palettes/Lego Full.csv</file>
+        <file>Palettes/Lego Store 1x1.csv</file>
+        <file>Palettes/Smartable Full.csv</file>
+        <file>Palettes/Smartable Pastel 12.csv</file>
+        <file>Palettes/Smartable Reduced.csv</file>
+        <file>Palettes/Smartable Skin 12.csv</file>
+        <file>Images/CircleBrick20.jpg</file>
+        <file>Images/SquareBrick20.jpg</file>
+        <file>Icons/icon-256.png</file>
+        <file>Images/GreyBrick16.jpg</file>
+        <file>Images/brick_dark grey.jpg</file>
+        <file>Stylesheet/Combinear.qss</file>
+        <file>Images/brick_dark blue.jpg</file>
+        <file>../../../Documents/MATLAB/Image/Lego Store 1x1 B&amp;W.csv</file>
+        <file>Palettes/Lego Store 1x1 B&amp;W.csv</file>
+        <file>Palettes/Lego Store B&amp;W.csv</file>
+    </qresource>
+    <qresource prefix="/new/prefix1"/>
+</RCC>
