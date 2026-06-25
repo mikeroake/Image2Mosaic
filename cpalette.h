@@ -14,20 +14,24 @@ public:
     CPalette( QWidget* parent);
 
     bool    load(QFile* pPaletteFile);
+//    void    loadCSVImport(int numRows, QFile* pPaletteFile);
     QString getName();
     QString getDescription(int index);
     int     getNumCols();
+    void    setNumCols(int numCols);
     QColor  getRgb(int index);
     int     getRed(int index);
     int     getGreen(int index);
     int     getBlue(int index);
 
+    QList<QString>  mDescriptionList;
+    QList<QColor>   mRgbColorList;
+    int             mNumCols;
+
+
 private:
     QWidget*        mpParent;
     QString         mPaletteName;
-    int             mNumCols;
-    QList<QString>  mDescriptionList;
-    QList<QColor>   mRgbColorList;
 };
 
 #endif // CPALETTE_H

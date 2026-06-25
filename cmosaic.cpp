@@ -66,13 +66,14 @@ QImage          mosaicImage;
     {
       mosaicImage = sourceImageScaled.scaled(mosaicSize.width()*20,mosaicSize.height()*20,Qt::IgnoreAspectRatio,Qt::SmoothTransformation);
     }
+    applyBrightnessContrast(&sourceImageScaled);
+
     CPalette palette = mpPaletteList->at(mpParams->getPaletteIndex());
     numCols = palette.getNumCols();
     mpPaletteCount->clear();
     mpPaletteCount->fill(0,numCols);
     mpMosaicMap->setSize(mosaicSize.height(),mosaicSize.width());
 
-    applyBrightnessContrast(&sourceImageScaled);
 
     totalTiles = mosaicSize.width()*mosaicSize.height();
     for(int row = 0; row < mosaicSize.height(); row++)
@@ -106,6 +107,42 @@ QImage          mosaicImage;
     }
     return mosaicImage;
 }
+
+
+
+QImage
+CMosaic::renderCSV( CPalette palette, QSize mosaicSize )
+{
+    long            totalTiles;
+    long            renderedTiles = 0;
+    int             percentComplete = 0;
+    QColor          mosaicRgb;
+    int             colrNum = 0;
+    QImage          mosaicImage( mosaicSize.width()*20, mosaicSize.height()*20, QImage::Format_RGB32);
+
+    totalTiles = mosaicSize.width()*mosaicSize.height();
+    for(int row = 0; row < mosaicSize.height(); row++)
+    {
+        for(int col = 0; col < mosaicSize.width(); col++)
+        {
+            colrNum = mpMosaicMap->getElement(row, col);
+            mosaicRgb = palette.getRgb( colrNum );
+            //qDebug() << colrNum << mosaicRgb.red() << mosaicRgb.green() << mosaicRgb.blue();
+
+            renderTile( &mosaicImage, mosaicRgb, col, row );
+
+            renderedTiles++;
+            percentComplete = (int) (100.0*((float) renderedTiles / (float) totalTiles));
+            gui->progressBar->setValue(percentComplete);
+            // force continual update of progress bar
+            QApplication::processEvents();
+        }
+    }
+    return mosaicImage;
+}
+
+
+
 
 
 void

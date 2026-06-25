@@ -261,7 +261,6 @@ void MainWindow::on_actionSave_Mosaic_triggered()
 void MainWindow::on_actionExport_CSV_triggered()
 {
 QString strNum;
-QString keyString = "@image2mosaic";
 bool dispColrName = false;
 
     if(!mMosaicImage.isNull())
@@ -273,15 +272,17 @@ bool dispColrName = false;
         QString filters("*.csv");
         QString csvFileName = QFileDialog::getSaveFileName(this,"Export CSV File",defaultFile,filters);
         QFile file(csvFileName);
+        CPalette palette = mPaletteList.at(mParams.getPaletteIndex());
 
         // this is export of palette inventory
         if(file.open(QFile::WriteOnly | QFile::Truncate))
         {
             QTextStream output(&file);
             // write CSV file header: keyString, no of rows, no of columns
-            output << keyString << ",";
-            output << mMosaicMap.getNumRows()<< ",";
-            output << mMosaicMap.getNumCols() << "\n";
+            output << KEYSTRING << ",";
+            output << VERSTRING << ",";
+            output << mMosaicMap.getNumCols()<< ",";
+            output << mMosaicMap.getNumRows() << "\n";
 
             // write Mosaic elements as matrix
             for( int row = 0; row < mMosaicMap.getNumRows(); row++)
@@ -290,14 +291,13 @@ bool dispColrName = false;
                 {
                     if( dispColrName == true)
                     {
-                        CPalette palette = mPaletteList.at(mParams.getPaletteIndex());
                         int colrNum = mMosaicMap.getElement(row,col);
                         QString description = palette.getDescription(colrNum);
                         output << description;
                     }
                     else
                     {
-                       strNum = QString::number(mMosaicMap.getElement(row,col));
+                       strNum = QString::number(mMosaicMap.getElement(row,col) + 1);
                        output << strNum;
                     }
                     if( (col+1) < mMosaicMap.getNumCols())
@@ -307,17 +307,20 @@ bool dispColrName = false;
                }
                output << "\n";
             }
-            // write palette details
-            output << "Palette size, "<< mPaletteCount.size() << "\n";
+            // write palette header
+            output << PALETTESIZE << "," << mPaletteCount.size() << ",";
+            output << "Colours used, "<< mNumCols << ",";
+            output << palette.getName() << ".csv" <<  "\n";
+
             for(int colr = 0;colr < mPaletteCount.size();colr++)
             {
-                CPalette palette = mPaletteList.at(mParams.getPaletteIndex());
                 QString description = palette.getDescription(colr);
                 int red = palette.getRed(colr);
                 int green = palette.getGreen(colr);
                 int blue = palette.getBlue(colr);
                 QString count = QString::number(mPaletteCount.at(colr));
-                output << colr << "," << red << "," << green << "," << blue << "," << description << "," << count << "\n";
+                output << (colr + 1) << "," << red << "," << green << "," << blue << "," << description << "," << count << "\n";
+                qDebug() << red << green << blue;
             }
             file.close();
         }
@@ -331,9 +334,15 @@ bool dispColrName = false;
 
 void MainWindow::on_actionImport_CSV_triggered()
 {
+unsigned int brickPitch = 8;
 QString csvString;
 QStringList csvList;
-QString keyString = "@image2mosaic";
+CPalette palette(this);
+QString colrStr;
+QString csvLine;
+
+int colrNum;
+
 
     QMessageBox::StandardButton reply;
     reply = QMessageBox::question(this, "", "Importing a CSV file will erase the current render.  Do you wish to continue?");
@@ -352,36 +361,101 @@ QString keyString = "@image2mosaic";
         QMessageBox::information(this, "", "Failed to Load File");
         return;
     }
+    // read contents of entire file
+    QString temp = file.readAll();
+    //QTextStream csvStream(&fileName);
+    QTextStream csvStream(&temp);
 
-    csvString = file.readAll();
-    csvList = parseCSV(csvString);
+    // read file header line
+    csvLine = csvStream.readLine();
+    csvList = csvLine.split(",");
+
     // check first entry in file
-    if( csvList.at(0) != keyString)
+    if( csvList.at(0) != KEYSTRING )
     {
-        QMessageBox::warning(this, "", "File Incorrect Format");
+        QMessageBox::warning(this, "", "File Incorrect Format - KEYSTRING");
         file.close();
         return;
     }
-    int width = csvList.at(1).toInt();
-    int height = csvList.at(2).toInt();
+    // ignore second enty (VERSTRING); reserved for future use
 
-    int index = 3;
-    for( int row = 1; row <= width; row++)
+    int width = csvList.at(2).toInt();
+    int height = csvList.at(3).toInt();
+    //qDebug() << width << height;
+    QSize mosaicSize = QSize(width,height);
+    mMosaicMap.setSize( height, width );
+
+    // read mosaic map
+    for( int row = 0; row < height; row++)
     {
-        for( int col = 1; col <= height; col++)
+        // read each row of array
+        csvLine = csvStream.readLine();
+        csvList = csvLine.split(",");
+        // qDebug() << csvLine;
+        for( int col = 0; col < width; col++)
         {
-            index++;
+            colrStr = csvList.at(col);
+            colrStr.remove(QChar(0x0001));
+            colrNum = colrStr.toInt();
+            //qDebug() << colrNum;
+            mMosaicMap.setElement(row, col, colrNum-1);
         }
+    }
+
+    // read palette header
+    csvLine = csvStream.readLine();
+    csvList = csvLine.split(",");
+
+    if( csvList.at(0) != PALETTESIZE )
+    {
+        QMessageBox::warning(this, "", "File Incorrect Format - PALETTESIZE");
+        file.close();
+        return;
+    }
+    palette.mNumCols = csvList.at(1).toInt();
+    //int colrsUsed = csvList.at(3).toInt();
+
+    // read palette table
+    palette.mDescriptionList.clear();
+    palette.mRgbColorList.clear();
+
+    for( int colr = 1; colr <= palette.mNumCols; colr++)
+    {
+        csvLine = csvStream.readLine();
+        csvList = csvLine.split(",");
+        palette.mDescriptionList.append(csvList.at(4));
+        QColor rgbCol(csvList.at(1).toInt(), csvList.at(2).toInt(), csvList.at(3).toInt());
+        palette.mRgbColorList.append(rgbCol);
     }
     file.close();
 
+    // render mosaic
+    mMosaicImage = mpMosaic->renderCSV( palette, mosaicSize );
+
+    // display rendered mosaic
+    QSize mosaicWinSize = ui->mosaicView->size();
+    QImage mosaicImageWin = mMosaicImage.scaled(mosaicWinSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+    QGraphicsScene* mosaicGraphics = new QGraphicsScene( this );
+    mosaicGraphics->addPixmap( QPixmap::fromImage( mosaicImageWin ));
+    ui->mosaicView->setBackgroundBrush(QBrush(Qt::lightGray, Qt::SolidPattern));
+    ui->mosaicView->setScene( mosaicGraphics);
+
+    QString mosaicText = QString("%1 x %2 bricks (%3 x %4 mm)").arg(mosaicSize.width()).arg(mosaicSize.height()).arg(brickPitch*mosaicSize.width()).arg(brickPitch*mosaicSize.height());
+    ui->mosaicLabel->setText(mosaicText);
+
+    mNumCols = mPaletteCount.size() - mPaletteCount.count(0);
+    QString countText = QString("%1/%2 palette colours").arg(mNumCols).arg(mPaletteCount.size());
+    ui->countLabel->setText(countText);
+
+    ui->actionSave_Mosaic->setEnabled(true);
+    ui->actionExport_CSV->setEnabled(false);
 }
 
 
 void MainWindow::renderButtonClicked()
 {
 unsigned int    brickPitch = 8;
-int             numCols;
 
     // calculate size of mosaic in bricks
     QSize mosaicSize = mpMosaic->getSize( mSourceImage );
@@ -400,8 +474,8 @@ int             numCols;
     QString mosaicText = QString("%1 x %2 bricks (%3 x %4 mm)").arg(mosaicSize.width()).arg(mosaicSize.height()).arg(brickPitch*mosaicSize.width()).arg(brickPitch*mosaicSize.height());
     ui->mosaicLabel->setText(mosaicText);
 
-    numCols = mPaletteCount.size() - mPaletteCount.count(0);
-    QString countText = QString("%1/%2 palette colours").arg(numCols).arg(mPaletteCount.size());
+    mNumCols = mPaletteCount.size() - mPaletteCount.count(0);
+    QString countText = QString("%1/%2 palette colours").arg(mNumCols).arg(mPaletteCount.size());
     ui->countLabel->setText(countText);
 
     ui->actionSave_Mosaic->setEnabled(true);

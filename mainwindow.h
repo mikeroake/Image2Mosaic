@@ -37,6 +37,7 @@ public:
     QString             mPrefix;
     QList<CPalette>     mPaletteList;
     QVector<int>        mPaletteCount;
+    int                 mNumCols;
     CMosaicParams       mParams;
     CMosaic*            mpMosaic;
     CMatrix             mMosaicMap;
