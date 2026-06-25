@@ -1,5 +1,8 @@
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
+
+#include <exiv2/exiv2.hpp>
+
 #include <QFile>
 #include <QString>
 #include <QFileDialog>
@@ -27,7 +30,10 @@ MainWindow::MainWindow(QWidget *parent)
 
     //open qss file
     QFile file(":/resources/Stylesheet/Combinear.qss");
-    file.open(QFile::ReadOnly);
+    if( !file.open(QFile::ReadOnly))
+    {
+         return;
+    }
 
     QString styleSheet { QString(file.readAll()) };
 
@@ -73,11 +79,25 @@ MainWindow::MainWindow(QWidget *parent)
     mTileList.append(tileImage);
 
     QGraphicsScene* sourceGraphics = new QGraphicsScene( this );
-    ui->sourceImageView->setBackgroundBrush(QBrush(Qt::lightGray, Qt::SolidPattern));
+    //ui->sourceImageView->setBackgroundBrush(QBrush(Qt::lightGray, Qt::SolidPattern));
+    ui->sourceImageView->setBackgroundBrush(QBrush(Qt::darkRed, Qt::SolidPattern));
+    //ui->drag & drop of source files
     ui->sourceImageView->setScene( sourceGraphics);
+    // enable ImageView->viewport()->setAcceptDrops(true);
+    ui->sourceImageView->setAcceptDrops(true);
+    //ui->sourceImageView->setStyleSheet("backgound: transparent;");
 
-    //ui->sourceImageView->setAcceptDrops(true);
-    //ui->sourceImageView->dropEvent();
+    mDropZoneText = new QLabel("Drop Zone", ui->sourceImageView);
+    mDropZoneText->setAlignment(Qt::AlignCenter);
+    mDropZoneText->setStyleSheet(
+        "background: transparent; "
+        "color: gray; "
+        "font: 15pt 'Arial'; ");
+    mDropZoneText->setAlignment(Qt::AlignCenter);
+    mDropZoneText->setGeometry( 0,0,ui->sourceImageView->width(),ui->sourceImageView->height() );
+    mDropZoneText->setAttribute(Qt::WA_TransparentForMouseEvents);
+    mDropZoneText->setStyleSheet("backgound: transparent;");
+    mDropZoneText->show();
 
     QGraphicsScene* mosaicGraphics = new QGraphicsScene( this );
     ui->mosaicView->setBackgroundBrush(QBrush(Qt::lightGray, Qt::SolidPattern));
@@ -124,6 +144,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->randomSlider, &QSliderPlus::valueChanged, this, &MainWindow::randomSliderChanged);
 
     connect(ui->renderButton, &QPushButton::clicked, this, &MainWindow::renderButtonClicked);
+
+    connect(ui->sourceImageView, &CImageDropView::imageDropped, this, &MainWindow::onDropReceived);
 
     ui->progressBar->setRange(0,100);
     ui->progressBar->reset();
@@ -194,6 +216,16 @@ MainWindow::saveSettings()
 void
 MainWindow::on_actionLoad_Image_triggered()
 {
+    if( mImageRendered == true)
+    {
+        QMessageBox::StandardButton reply;
+        reply = QMessageBox::question(this, "", "Importing a CSV file will erase the current render.  Do you wish to continue?");
+        if (reply == QMessageBox::No)
+        {
+            return;
+        }
+    }
+
     QString filters("*.jpg;;*.png");
     QString sourceFileName = QFileDialog::getOpenFileName(this, "Select Image File",mSourceDir, filters );
     if (!sourceFileName.isNull())
@@ -215,6 +247,7 @@ MainWindow::on_actionLoad_Image_triggered()
         sourceGraphics->addPixmap( QPixmap::fromImage( sourceImageWin ));
         ui->sourceImageView->setBackgroundBrush(QBrush(Qt::lightGray, Qt::SolidPattern));
         ui->sourceImageView->setScene(sourceGraphics);
+        mDropZoneText->hide();
 
         // display size of source image
         QString pixelText = QString("%1 x %2 pixels").arg(sourceSize.width()).arg(sourceSize.height());
@@ -232,8 +265,9 @@ MainWindow::on_actionLoad_Image_triggered()
         ui->actionExport_CSV->setEnabled(false);
 
         // clear info text under mosaic
-        QString mosaicText = QString();
-        ui->mosaicLabel->setText(mosaicText);
+        QString emptyText = QString();
+        ui->mosaicLabel->setText(emptyText);
+        ui->countLabel->setText(emptyText);
     }
 }
 
@@ -249,7 +283,34 @@ void MainWindow::on_actionSave_Mosaic_triggered()
         if (!mosaicFile.isNull())
         {
             mMosaicImage.save( mosaicFile,"JPG", 100);
-        }
+
+            // open with Exiv2 to add metadata
+            try
+            {
+                // Convert QString to std::string for Exiv2 compatibility
+                std::string stdPath = mosaicFile.toStdString();
+
+                auto exivImage = Exiv2::ImageFactory::open(stdPath);
+                exivImage->readMetadata();
+
+                Exiv2::ExifData &exifData = exivImage->exifData();
+
+                // Set your custom info
+                exifData["Exif.Image.Artist"] = "image2mosaic";
+                exifData["Exif.Photo.UserComment"] = "Custom data added in 2026";
+
+                exivImage->setExifData(exifData);
+                exivImage->writeMetadata();
+
+                qDebug() << "Metadata saved successfully.";
+            }
+            catch (Exiv2::Error& e)
+            {
+                // Exiv2 uses exceptions for error handling
+                qDebug() << "Exiv2 Error:" << e.what();
+            }
+
+        }        
     }
     else
     {
@@ -260,9 +321,7 @@ void MainWindow::on_actionSave_Mosaic_triggered()
 
 void MainWindow::on_actionExport_CSV_triggered()
 {
-QString strNum;
-QString keyString = "@image2mosaic";
-bool dispColrName = false;
+int strNum;
 
     if(!mMosaicImage.isNull())
     {
@@ -273,33 +332,25 @@ bool dispColrName = false;
         QString filters("*.csv");
         QString csvFileName = QFileDialog::getSaveFileName(this,"Export CSV File",defaultFile,filters);
         QFile file(csvFileName);
+        CPalette palette = mPaletteList.at(mParams.getPaletteIndex());
 
         // this is export of palette inventory
         if(file.open(QFile::WriteOnly | QFile::Truncate))
         {
             QTextStream output(&file);
             // write CSV file header: keyString, no of rows, no of columns
-            output << keyString << ",";
-            output << mMosaicMap.getNumRows()<< ",";
-            output << mMosaicMap.getNumCols() << "\n";
+            output << KEYSTRING << ",";
+            output << VERSTRING << ",";
+            output << mMosaicMap.getNumCols()<< ",";
+            output << mMosaicMap.getNumRows() << "\n";
 
             // write Mosaic elements as matrix
             for( int row = 0; row < mMosaicMap.getNumRows(); row++)
             {
                 for( int col = 0; col < mMosaicMap.getNumCols(); col++)
                 {
-                    if( dispColrName == true)
-                    {
-                        CPalette palette = mPaletteList.at(mParams.getPaletteIndex());
-                        int colrNum = mMosaicMap.getElement(row,col);
-                        QString description = palette.getDescription(colrNum);
-                        output << description;
-                    }
-                    else
-                    {
-                       strNum = QString::number(mMosaicMap.getElement(row,col));
-                       output << strNum;
-                    }
+                    strNum = mMosaicMap.getElement(row,col) + 1;
+                    output << strNum;
                     if( (col+1) < mMosaicMap.getNumCols())
                     {
                        output << ",";
@@ -307,17 +358,21 @@ bool dispColrName = false;
                }
                output << "\n";
             }
-            // write palette details
-            output << "Palette size, "<< mPaletteCount.size() << "\n";
+
+            // write palette header
+            output << PALETTESIZE << "," << mPaletteCount.size() << ",";
+            output << "Colours used, "<< mNumCols << ",";
+            output << palette.getName() << ".csv" <<  "\n";
+
+            // write palette entries
             for(int colr = 0;colr < mPaletteCount.size();colr++)
             {
-                CPalette palette = mPaletteList.at(mParams.getPaletteIndex());
                 QString description = palette.getDescription(colr);
                 int red = palette.getRed(colr);
                 int green = palette.getGreen(colr);
                 int blue = palette.getBlue(colr);
                 QString count = QString::number(mPaletteCount.at(colr));
-                output << colr << "," << red << "," << green << "," << blue << "," << description << "," << count << "\n";
+                output << (colr + 1) << "," << red << "," << green << "," << blue << "," << description << "," << count << "\n";
             }
             file.close();
         }
@@ -331,19 +386,30 @@ bool dispColrName = false;
 
 void MainWindow::on_actionImport_CSV_triggered()
 {
+unsigned int brickPitch = 8;
 QString csvString;
 QStringList csvList;
-QString keyString = "@image2mosaic";
+CPalette palette(this);
+QString colrStr;
+QString csvLine;
 
-    QMessageBox::StandardButton reply;
-    reply = QMessageBox::question(this, "", "Importing a CSV file will erase the current render.  Do you wish to continue?");
-    if (reply == QMessageBox::No)
+int colrNum;
+
+
+    if( mImageRendered == true)
     {
-        return;
+        QMessageBox::StandardButton reply;
+        reply = QMessageBox::question(this, "", "Importing a CSV file will erase the current render.  Do you wish to continue?");
+        if (reply == QMessageBox::No)
+        {
+            return;
+        }
     }
+
     QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"), mSourceDir, tr("csv files (*.csv)"));
     if( fileName.isEmpty() || fileName.isNull())
     {
+        // this handles 'Cancel' button on the dialog
         return;
     }
     QFile file(fileName);
@@ -353,35 +419,102 @@ QString keyString = "@image2mosaic";
         return;
     }
 
-    csvString = file.readAll();
-    csvList = parseCSV(csvString);
+    // open image file & display title
+    QFileInfo fileInfo(fileName);
+    mSourceFile = fileInfo.fileName();
+    QString mainTitle = "Image2Mosaic ("+mSourceFile+")";
+    this->setWindowTitle(mainTitle);
+
+    // read contents of entire file
+    QString temp = file.readAll();
+    QTextStream csvStream(&temp);
+
+    // read file header line
+    csvLine = csvStream.readLine();
+    csvList = csvLine.split(",");
+
     // check first entry in file
-    if( csvList.at(0) != keyString)
+    if( csvList.at(0) != KEYSTRING )
     {
-        QMessageBox::warning(this, "", "File Incorrect Format");
+        QMessageBox::warning(this, "", "File Incorrect Format - KEYSTRING");
         file.close();
         return;
     }
-    int width = csvList.at(1).toInt();
-    int height = csvList.at(2).toInt();
+    // ignore second enty (VERSTRING); reserved for future use
 
-    int index = 3;
-    for( int row = 1; row <= width; row++)
+    int width = csvList.at(2).toInt();
+    int height = csvList.at(3).toInt();
+    QSize mosaicSize = QSize(width,height);
+    mMosaicMap.setSize( height, width );
+
+    // read mosaic map
+    for( int row = 0; row < height; row++)
     {
-        for( int col = 1; col <= height; col++)
+        // read each row of array
+        csvLine = csvStream.readLine();
+        csvList = csvLine.split(",");
+        for( int col = 0; col < width; col++)
         {
-            index++;
+            colrNum = csvList.at(col).toInt();
+            mMosaicMap.setElement(row, col, colrNum-1);
         }
+    }
+
+    // read palette header
+    csvLine = csvStream.readLine();
+    csvList = csvLine.split(",");
+
+    if( csvList.at(0) != PALETTESIZE )
+    {
+        QMessageBox::warning(this, "", "File Incorrect Format - PALETTESIZE");
+        file.close();
+        return;
+    }
+    palette.mNumCols = csvList.at(1).toInt();
+    int colrsUsed = csvList.at(3).toInt();
+
+    // read palette table
+    palette.mDescriptionList.clear();
+    palette.mRgbColorList.clear();
+
+    for( int colr = 1; colr <= palette.mNumCols; colr++)
+    {
+        csvLine = csvStream.readLine();
+        csvList = csvLine.split(",");
+        palette.mDescriptionList.append(csvList.at(4));
+        QColor rgbCol(csvList.at(1).toInt(), csvList.at(2).toInt(), csvList.at(3).toInt());
+        palette.mRgbColorList.append(rgbCol);
     }
     file.close();
 
+    // render mosaic
+    mMosaicImage = mpMosaic->renderCSV( palette, mosaicSize );
+
+    // display rendered mosaic
+    QSize mosaicWinSize = ui->mosaicView->size();
+    QImage mosaicImageWin = mMosaicImage.scaled(mosaicWinSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+    QGraphicsScene* mosaicGraphics = new QGraphicsScene( this );
+    mosaicGraphics->addPixmap( QPixmap::fromImage( mosaicImageWin ));
+    ui->mosaicView->setBackgroundBrush(QBrush(Qt::lightGray, Qt::SolidPattern));
+    ui->mosaicView->setScene( mosaicGraphics);
+
+    QString mosaicText = QString("%1 x %2 bricks (%3 x %4 mm)").arg(mosaicSize.width()).arg(mosaicSize.height()).arg(brickPitch*mosaicSize.width()).arg(brickPitch*mosaicSize.height());
+    ui->mosaicLabel->setText(mosaicText);
+
+    mNumCols = mPaletteCount.size() - mPaletteCount.count(0);
+    QString countText = QString("%1/%2 palette colours").arg(colrsUsed).arg(palette.mNumCols);
+    ui->countLabel->setText(countText);
+
+    mImageRendered = true;
+    ui->actionSave_Mosaic->setEnabled(true);
+    ui->actionExport_CSV->setEnabled(false);
 }
 
 
 void MainWindow::renderButtonClicked()
 {
 unsigned int    brickPitch = 8;
-int             numCols;
 
     // calculate size of mosaic in bricks
     QSize mosaicSize = mpMosaic->getSize( mSourceImage );
@@ -400,10 +533,11 @@ int             numCols;
     QString mosaicText = QString("%1 x %2 bricks (%3 x %4 mm)").arg(mosaicSize.width()).arg(mosaicSize.height()).arg(brickPitch*mosaicSize.width()).arg(brickPitch*mosaicSize.height());
     ui->mosaicLabel->setText(mosaicText);
 
-    numCols = mPaletteCount.size() - mPaletteCount.count(0);
-    QString countText = QString("%1/%2 palette colours").arg(numCols).arg(mPaletteCount.size());
+    mNumCols = mPaletteCount.size() - mPaletteCount.count(0);
+    QString countText = QString("%1/%2 palette colours").arg(mNumCols).arg(mPaletteCount.size());
     ui->countLabel->setText(countText);
 
+    mImageRendered = true;
     ui->actionSave_Mosaic->setEnabled(true);
     ui->actionExport_CSV->setEnabled(true);
 }
@@ -657,84 +791,44 @@ MainWindow::sourceLightnessContrast()
 }
 
 
-// from https://stackoverflow.com/questions/27318631/parsing-through-a-csv-file-in-qt
-QStringList
-MainWindow::parseCSV(const QString &string)
+void
+MainWindow::onDropReceived(const QImage& image, const QString& fileWithExt)
 {
-    enum State {Normal, Quote} state = Normal;
-    QStringList fields;
-    QString value;
+    mSourceFile = fileWithExt;
+    QString mainTitle = "Image2Mosaic ("+mSourceFile+")";
+    this->setWindowTitle(mainTitle);
 
-    for (int i = 0; i < string.size(); i++)
-    {
-        const QChar current = string.at(i);
+    // load source image file and resize for display in source window
+    QSize sourceWinSize = ui->sourceImageView->size();
+    mSourceImage = image;
+    QSize sourceSize = mSourceImage.size();
+    QImage sourceImageWin = mSourceImage.scaled(sourceWinSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 
-        // Normal state
-        if (state == Normal)
-        {
-            // Comma
-            if (current == ',')
-            {
-                // Save field
-                fields.append(value.trimmed());
-                value.clear();
-            }
+    // display source image in source window
+    QGraphicsScene* sourceGraphics = new QGraphicsScene( this );
+    sourceGraphics->addPixmap( QPixmap::fromImage( sourceImageWin ));
+    ui->sourceImageView->setBackgroundBrush(QBrush(Qt::lightGray, Qt::SolidPattern));
+    ui->sourceImageView->setScene(sourceGraphics);
+    mDropZoneText->hide();
 
-            // Double-quote
-            else if (current == '"')
-            {
-                state = Quote;
-                value += current;
-            }
+    // display size of source image
+    QString pixelText = QString("%1 x %2 pixels").arg(sourceSize.width()).arg(sourceSize.height());
+    ui->pixelLabel->setText(pixelText);
 
-            // Other character
-            else
-                value += current;
-        }
+    // clear & prepare mosaic screen to render from fresh image
+    QGraphicsScene* mosaicGraphics = new QGraphicsScene( this );
+    ui->mosaicView->setBackgroundBrush(QBrush(Qt::lightGray, Qt::SolidPattern));
+    ui->mosaicView->setScene( mosaicGraphics);
+    mMosaicImage = QImage();
+    mImageLoaded = true;
+    setSliders();
+    resetRender();
+    ui->actionSave_Mosaic->setEnabled(false);
+    ui->actionExport_CSV->setEnabled(false);
 
-        // In-quote state
-        else if (state == Quote)
-        {
-            // Another double-quote
-            if (current == '"')
-            {
-                if (i < string.size())
-                {
-                    // A double double-quote?
-                    if (i+1 < string.size() && string.at(i+1) == '"')
-                    {
-                        value += '"';
-
-                        // Skip a second quote character in a row
-                        i++;
-                    }
-                    else
-                    {
-                        state = Normal;
-                        value += '"';
-                    }
-                }
-            }
-
-            // Other character
-            else
-                value += current;
-        }
-    }
-
-    if (!value.isEmpty())
-        fields.append(value.trimmed());
-
-    // Quotes are left in until here; so when fields are trimmed, only whitespace outside of
-    // quotes is removed.  The outermost quotes are removed here.
-    for (int i=0; i<fields.size(); ++i)
-        if (fields[i].length()>=1 && fields[i].left(1)=='"')
-        {
-            fields[i]=fields[i].mid(1);
-            if (fields[i].length()>=1 && fields[i].right(1)=='"')
-                fields[i]=fields[i].left(fields[i].length()-1);
-        }
-
-    return fields;
+    // clear info text under mosaic
+    QString emptyText = QString();
+    ui->mosaicLabel->setText(emptyText);
+    ui->countLabel->setText(emptyText);
 }
 

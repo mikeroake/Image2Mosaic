@@ -66,13 +66,13 @@
      </size>
     </property>
     <property name="verticalScrollBarPolicy">
-     <enum>Qt::ScrollBarAlwaysOff</enum>
+     <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
     </property>
     <property name="horizontalScrollBarPolicy">
-     <enum>Qt::ScrollBarAlwaysOff</enum>
+     <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
     </property>
    </widget>
-   <widget class="QGraphicsView" name="sourceImageView">
+   <widget class="CImageDropView" name="sourceImageView">
     <property name="geometry">
      <rect>
       <x>20</x>
@@ -88,10 +88,10 @@
      </sizepolicy>
     </property>
     <property name="verticalScrollBarPolicy">
-     <enum>Qt::ScrollBarAlwaysOff</enum>
+     <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
     </property>
     <property name="horizontalScrollBarPolicy">
-     <enum>Qt::ScrollBarAlwaysOff</enum>
+     <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOff</enum>
     </property>
    </widget>
    <widget class="QLabel" name="pixelLabel">
@@ -107,7 +107,7 @@
      <string/>
     </property>
     <property name="alignment">
-     <set>Qt::AlignCenter</set>
+     <set>Qt::AlignmentFlag::AlignCenter</set>
     </property>
    </widget>
    <widget class="QLabel" name="mosaicLabel">
@@ -123,7 +123,7 @@
      <string/>
     </property>
     <property name="alignment">
-     <set>Qt::AlignCenter</set>
+     <set>Qt::AlignmentFlag::AlignCenter</set>
     </property>
    </widget>
    <widget class="QComboBox" name="paletteComboBox">
@@ -149,7 +149,7 @@
      <string>Palette</string>
     </property>
     <property name="alignment">
-     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+     <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
     </property>
    </widget>
    <widget class="QSliderPlus" name="brightSlider" native="true">
@@ -228,7 +228,7 @@
      <string/>
     </property>
     <property name="alignment">
-     <set>Qt::AlignCenter</set>
+     <set>Qt::AlignmentFlag::AlignCenter</set>
     </property>
    </widget>
    <widget class="QSliderPlus" name="contrastSlider" native="true">
@@ -450,6 +450,11 @@
    <extends>QWidget</extends>
    <header>qsliderplus.h</header>
    <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>CImageDropView</class>
+   <extends>QGraphicsView</extends>
+   <header location="global">cimagedropview.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

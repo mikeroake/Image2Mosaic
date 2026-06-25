@@ -8,12 +8,13 @@ CONFIG += sdk_no_version_check
 # In order to do so, uncomment the following line.
 DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
-QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.15
-QMAKE_APPLE_DEVICE_ARCHS = x86_64
+QMAKE_APPLE_DEVICE_ARCHS = x86_64 arm64
+QMAKE_MACOSX_DEPLOYMENT_TARGET = 13.0
 ICON = i2m.icns
 
 SOURCES += \
     aboutdialog.cpp \
+    cimagedropview.cpp \
     cmatrix.cpp \
     cmosaic.cpp \
     cmosaicparams.cpp \
@@ -26,6 +27,7 @@ SOURCES += \
 
 HEADERS += \
     aboutdialog.h \
+    cimagedropview.h \
     cmatrix.h \
     cmosaic.h \
     cmosaicparams.h \
@@ -49,5 +51,17 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 RESOURCES += \
     resource.qrc
 
-DISTFILES += \
-    ../../../Documents/MATLAB/Image/Lego Store 1x1 B&W.csv
+#DISTFILES += \
+#    ../../../Documents/MATLAB/Image/Lego Store 1x1 B&W.csv
+
+# Link to custom Universal Exiv2 (see Step 2 for creating this path)
+INCLUDEPATH += /usr/local/universal/include
+LIBS += -L/usr/local/universal/lib \
+    -lexiv2 \
+    -linireader \
+    -linih \
+    -lexpat \
+    -lz \
+    -liconv \
+    -lc++
+DEPENDPATH += /usr/local/universal/include

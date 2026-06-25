@@ -37,6 +37,7 @@ public:
     QString             mPrefix;
     QList<CPalette>     mPaletteList;
     QVector<int>        mPaletteCount;
+    int                 mNumCols;
     CMosaicParams       mParams;
     CMosaic*            mpMosaic;
     CMatrix             mMosaicMap;
@@ -74,7 +75,8 @@ private slots:
 
     void resetRender();
 
-
+    // slot for drag and drop of source files
+    void onDropReceived(const QImage& image, const QString& fileWithExt);
 
 public slots:
     void updateProgressBar(float percentComplete);
@@ -91,10 +93,9 @@ private:
     void setSliders();
     void sourceLightnessContrast();
 
-    // from https://stackoverflow.com/questions/27318631/parsing-through-a-csv-file-in-qt
-    QStringList parseCSV(const QString &string);
-
     const QString DEFAULT_DIR = "/Users/michaelroake/Documents/MATLAB/Image";
     const QString DEFAULT_PREFIX = "brick_";
+
+    QLabel* mDropZoneText;
 };
 #endif // MAINWINDOW_H

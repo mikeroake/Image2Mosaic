@@ -7,6 +7,9 @@ typedef enum { none, rgb, hsv, greyscale, hybrid } algorithm;
 
 typedef enum { stud, square, circle } tile;
 
+const QString KEYSTRING = "@image2mosaic";
+const QString VERSTRING = "1.0";
+const QString PALETTESIZE = "Palette size";
 const int NUM_SIZES = 9;
 const int SIZE_EQ_SOURCE = 1024;
 const int MAX_SIZE[NUM_SIZES] = {16, 32, 48, 64, 96, 128, 192, 256, SIZE_EQ_SOURCE };

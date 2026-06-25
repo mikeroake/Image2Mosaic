@@ -71,3 +71,14 @@ Thumbs.db
 *.dll
 *.exe
 
+build*/
+*-build-*
+*.pro.user
+*.pro.user.*
+
+# Ignore Qt Creator code model and compilation indexing databases
+*.idx
+.qtc_clangd/
+.qmake.stash
+moc_predefs.h
+

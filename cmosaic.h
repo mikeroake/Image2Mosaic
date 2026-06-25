@@ -24,6 +24,7 @@ public:
 
     QSize           getSize( QImage sourceImage );
     QImage          render( QImage sourceImage, QSize mosaicSize );
+    QImage          renderCSV( CPalette palette, QSize mosaicSize );
     void            applyBrightnessContrast( QImage* image );
     void            renderTile( QImage* mosaicImage, QColor mosicRgb, int xPos, int yPos );
     CSearchResult   searchAlgorithm( QColor sourceColor, CPalette palette );
