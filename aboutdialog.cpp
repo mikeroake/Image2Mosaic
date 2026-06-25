@@ -9,6 +9,10 @@ AboutDialog::AboutDialog(QWidget *parent) :
     QChar copyrightSymbol(0x00A9);
     QString copyrightText = "Copyright "+ (QString) copyrightSymbol + " 2022";
     ui->copyrightLabel->setText(copyrightText);
+
+    // Code to add clickable GitHub repository link
+    ui->aboutLabel->setText("Source Code: <a href='https://github.com/mikeroake/Image2Mosaic'>https://github.com/mikeroake/Image2Mosaic</a>");
+    ui->aboutLabel->setOpenExternalLinks(true);
 }
 
 AboutDialog::~AboutDialog()
