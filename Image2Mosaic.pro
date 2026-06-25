@@ -65,3 +65,6 @@ LIBS += -L/usr/local/universal/lib \
     -liconv \
     -lc++
 DEPENDPATH += /usr/local/universal/include
+
+DISTFILES += \
+    README.md
